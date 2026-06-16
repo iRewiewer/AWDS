@@ -13,7 +13,7 @@ The prototype is intended for dissertation/report support. It does not validate 
 - Deterministic runs from NumPy random seeds
 - Sticky run controls with live-run pause/resume
 - Scenario comparison mode using the same seed
-- Export history drawers with JSON, CSV, TXT summary, PNG chart, and ZIP downloads saved under `exports/`
+- Searchable export history drawers with run IDs, JSON, CSV, TXT summary, PNG chart, and ZIP downloads saved under `exports/`
 - Optional per-agent history collection for raw data exports
 
 ## Setup
@@ -32,12 +32,24 @@ You can install those dependencies in a virtual environment, a local Python inst
 streamlit run app.py
 ```
 
+Or use the helper script for your OS:
+
+```bash
+./run.sh
+```
+
+```bat
+run.bat
+```
+
 Then open the local Streamlit URL shown in the terminal.
 
 ## Project Structure
 
 ```text
 app.py
+run.sh
+run.bat
 simulation/
   config.py
   agent.py
@@ -67,7 +79,7 @@ The `Advanced slider ranges` panel lets you change the visible minimum and maxim
 
 ## Exports
 
-Completed runs appear in the export tab as expandable drawers with readable timestamps, seed, simulated day count, agent count, summary metrics, and download buttons. Click `Prepare export files` for a run to generate its JSON, CSV, TXT, PNG, and ZIP files under `exports/`.
+Completed runs appear in the export tab as searchable expandable drawers with readable timestamps, run IDs, seed, simulated day count, agent count, summary metrics, and download buttons. Click `Prepare export files` for a run to generate its JSON, CSV, TXT, PNG, and ZIP files under `exports/`.
 
 ## Model Notes
 

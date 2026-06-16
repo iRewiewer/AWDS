@@ -979,7 +979,17 @@ def render_export_tab() -> None:
         return
 
     st.caption("Completed runs are kept for this session. Open a drawer to prepare or download exports.")
-    for index, entry in enumerate(history):
+    search_query = st.text_input(
+        "Search export runs",
+        placeholder="Search scenario, timestamp, seed, day, or run id",
+        help="Filters the completed runs shown below.",
+    )
+    filtered_history = filter_export_history(history, search_query)
+    if not filtered_history:
+        st.warning("No completed runs match that search.")
+        return
+
+    for index, entry in enumerate(filtered_history):
         render_export_run_drawer(entry, expanded=index == 0)
 
 
@@ -990,6 +1000,9 @@ def render_export_run_drawer(entry: dict[str, Any], expanded: bool = False) -> N
     title = export_drawer_title(entry)
 
     with st.expander(title, expanded=expanded):
+        st.caption("Run ID")
+        st.code(entry["id"])
+
         meta_cols = st.columns(4)
         meta_cols[0].metric("Seed", result.get("seed", config.get("random_seed", "n/a")))
         meta_cols[1].metric("Days", summary.get("final_day", config.get("num_days", "n/a")))
@@ -1202,6 +1215,34 @@ def export_drawer_title(entry: dict[str, Any]) -> str:
     day = summary.get("final_day", result.get("config", {}).get("num_days", "n/a"))
     timestamp = readable_run_timestamp(entry)
     return f"{scenario} - {timestamp} - seed {seed}, day {day}"
+
+
+def filter_export_history(history: list[dict[str, Any]], search_query: str) -> list[dict[str, Any]]:
+    query = search_query.strip().lower()
+    if not query:
+        return history
+    return [
+        entry
+        for entry in history
+        if query in export_entry_search_text(entry)
+    ]
+
+
+def export_entry_search_text(entry: dict[str, Any]) -> str:
+    result = entry.get("result", {})
+    summary = result.get("final_summary", {})
+    config = result.get("config", {})
+    parts = [
+        str(entry.get("id", "")),
+        str(entry.get("label", "")),
+        readable_run_timestamp(entry),
+        str(result.get("scenario_name", "")),
+        str(result.get("seed", "")),
+        str(summary.get("final_day", "")),
+        str(config.get("num_days", "")),
+        str(config.get("num_agents", "")),
+    ]
+    return " ".join(parts).lower()
 
 
 def readable_run_timestamp(entry: dict[str, Any]) -> str:
