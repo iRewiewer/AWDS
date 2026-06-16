@@ -43,6 +43,7 @@ def export_txt_summary(result: dict[str, Any], path: Path) -> Path:
     config = result.get("config", {})
     summary = result.get("final_summary", {})
     scenario = result.get("scenario_name", "Unknown scenario")
+    engine = result.get("engine", "Custom")
     seed = result.get("seed", config.get("random_seed", "unknown"))
 
     interpretation = _interpret_result(result)
@@ -50,6 +51,7 @@ def export_txt_summary(result: dict[str, Any], path: Path) -> Path:
         "Adaptive Workplace Dynamics Simulator - Synthetic Run Summary",
         "",
         f"Scenario name: {scenario}",
+        f"Simulation engine: {engine}",
         f"Seed: {seed}",
         f"Number of agents: {config.get('num_agents')}",
         f"Number of simulated days: {config.get('num_days')}",
@@ -105,7 +107,8 @@ def export_png_charts(result: dict[str, Any], output_dir: Path, filename_prefix:
 
     timeseries_path = output_dir / f"{filename_prefix}_timeseries.png"
     fig, axes = plt.subplots(2, 2, figsize=(14, 9), constrained_layout=True)
-    fig.suptitle(f"{result.get('scenario_name', 'AWDS scenario')} - Synthetic Time Series")
+    engine = result.get("engine", "Custom")
+    fig.suptitle(f"{result.get('scenario_name', 'AWDS scenario')} ({engine}) - Synthetic Time Series")
 
     axes[0, 0].plot(df["day"], df["average_stress"], label="Stress", color="#d95f02")
     axes[0, 0].plot(df["day"], df["average_burnout"], label="Burnout", color="#7570b3")
@@ -147,7 +150,7 @@ def export_png_charts(result: dict[str, Any], output_dir: Path, filename_prefix:
     if not final_df.empty:
         distributions_path = output_dir / f"{filename_prefix}_final_distributions.png"
         fig, axes = plt.subplots(1, 3, figsize=(14, 4), constrained_layout=True)
-        fig.suptitle(f"{result.get('scenario_name', 'AWDS scenario')} - Final Agent Distributions")
+        fig.suptitle(f"{result.get('scenario_name', 'AWDS scenario')} ({engine}) - Final Agent Distributions")
         for axis, column, title, color in [
             (axes[0], "stress", "Stress", "#d95f02"),
             (axes[1], "burnout", "Burnout", "#7570b3"),
@@ -178,9 +181,10 @@ def export_zip(paths: list[Path], zip_path: Path) -> Path:
 def save_export_bundle(result: dict[str, Any], export_dir: Path = EXPORT_DIR) -> dict[str, Path | list[Path]]:
     export_dir.mkdir(parents=True, exist_ok=True)
     scenario = slugify(str(result.get("scenario_name", "awds-run")))
+    engine = slugify(str(result.get("engine", "custom")))
     seed = result.get("seed", result.get("config", {}).get("random_seed", "seed"))
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    prefix = f"{scenario}_seed-{seed}_{stamp}"
+    prefix = f"{scenario}_{engine}_seed-{seed}_{stamp}"
 
     json_path = export_json(result, export_dir / f"{prefix}.json")
     csv_path = export_csv(result, export_dir / f"{prefix}.csv")

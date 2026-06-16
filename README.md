@@ -11,9 +11,10 @@ The prototype is intended for dissertation/report support. It does not validate 
 - Explicit `Apply preset` and `Save as preset` controls
 - Advanced slider-range editor with visible min/max bounds
 - Deterministic runs from NumPy random seeds
+- Engine selector for the original custom NumPy engine, a Mesa-backed engine, or both engines at once
 - Sticky run controls with live-run pause/resume
-- Scenario comparison mode using the same seed
-- Searchable export history drawers with run IDs, JSON, CSV, TXT summary, PNG chart, and ZIP downloads saved under `exports/`
+- Scenario comparison mode using the same seed and selected engine mode
+- Searchable export history drawers with run IDs, engine labels, JSON, CSV, TXT summary, PNG chart, and ZIP downloads saved under `exports/`
 - Optional per-agent history collection for raw data exports
 
 ## Setup
@@ -54,6 +55,8 @@ simulation/
   config.py
   agent.py
   engine.py
+  mesa_engine.py
+  engines.py
   scenarios.py
   metrics.py
   exports.py
@@ -65,7 +68,7 @@ user_presets.json  # created locally if you save custom presets
 
 ## Reproducibility
 
-Every simulation uses `numpy.random.default_rng(seed)`. The same seed and same configuration produce the same aggregate time series. Changing either the seed or parameters should produce visibly different synthetic trajectories.
+Every simulation uses `numpy.random.default_rng(seed)`. The same seed, engine, and configuration produce the same aggregate time series. Changing the seed, parameters, or selected engine can produce visibly different synthetic trajectories.
 
 ## Local Presets
 
@@ -75,14 +78,18 @@ Factory presets are built into `simulation/scenarios.py`. User presets saved fro
 
 The sidebar has a sticky `Run controls` panel so the run, pause/resume, and clear controls remain reachable while scrolling through parameters. Presets are not applied automatically when selected; choose a factory or user preset, then click `Apply preset`.
 
+The `Simulation engine` selector can run the original custom engine, the Mesa-backed engine, or `All engines`. `All engines` runs Custom and Mesa sequentially, stores both completed runs, and shows an overlay chart plus summary table for direct comparison. Live pause/resume is available for single-engine runs; all-engine runs execute in batch mode so the two outputs are generated together.
+
 The `Advanced slider ranges` panel lets you change the visible minimum and maximum for individual sliders. The hard bounds are `0` to `10`, but most model defaults use normalized `0.0` to `1.0` values.
 
 ## Exports
 
-Completed runs appear in the export tab as searchable expandable drawers with readable timestamps, run IDs, seed, simulated day count, agent count, summary metrics, and download buttons. Click `Prepare export files` for a run to generate its JSON, CSV, TXT, PNG, and ZIP files under `exports/`.
+Completed runs appear in the export tab as searchable expandable drawers with readable timestamps, run IDs, engine names, seed, simulated day count, agent count, summary metrics, and download buttons. Click `Prepare export files` for a run to generate its JSON, CSV, TXT, PNG, and ZIP files under `exports/`.
 
 ## Model Notes
 
 Each simulation step represents one workday by default. On each simulated day, the model applies organizational policies, personal modifiers, social-network influence, random events, agent state updates, and turnover checks. Values are normalized where practical, generally from `0.0` to `1.0`, while emotional state ranges from `-1.0` to `1.0`.
+
+The custom engine is a lightweight local implementation. The Mesa engine wraps the same AWDS employee update logic in Mesa `Model` and `Agent` objects, which makes it easier to explain the simulator as an agent-based model while preserving comparable output fields.
 
 The central equations are intentionally simple and tunable. They are designed to support transparent scenario exploration rather than realistic causal inference.
