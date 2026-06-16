@@ -81,6 +81,10 @@ The `Advanced slider ranges` panel lets you change the visible minimum and maxim
 
 Completed runs appear in the export tab as searchable expandable drawers with readable timestamps, run IDs, seed, simulated day count, agent count, summary metrics, and download buttons. Click `Prepare export files` for a run to generate its JSON, CSV, TXT, PNG, and ZIP files under `exports/`.
 
+## Report
+
+LaTeX report sources are available under `report/`, with Romanian and English variants. The results section is intentionally left as a skeleton so final scenario data and exported figures can be inserted later.
+
 ## Model Notes
 
 Each simulation step represents one workday by default. On each simulated day, the model applies organizational policies, personal modifiers, social-network influence, random events, agent state updates, and turnover checks. Values are normalized where practical, generally from `0.0` to `1.0`, while emotional state ranges from `-1.0` to `1.0`.

@@ -1,0 +1,225 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[romanian]{babel}
+\usepackage{fontspec}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{enumitem}
+
+\geometry{margin=2.5cm}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!50!black,
+    urlcolor=blue!50!black,
+    citecolor=blue!50!black
+}
+\setlist{itemsep=0.25em, topsep=0.35em}
+
+\title{\textbf{Raport de implementare}\\Adaptive Workplace Dynamics Simulator}
+\author{Nume student: \textit{[de completat]}}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Acest document descrie prototipul Adaptive Workplace Dynamics Simulator (AWDS), o aplicație Python cu interfață Streamlit pentru simularea sintetică a dinamicii unui mediu de lucru. Raportul prezintă funcționalitățile implementate, modelul folosit, structura tehnică, dificultățile întâmpinate, limitările și direcțiile posibile de dezvoltare. Rezultatele numerice urmează să fie completate după rularea scenariilor finale.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Descrierea prototipului}
+
+AWDS este un prototip software care simulează o organizație formată din agenți de tip angajat. Fiecare agent are o stare internă dinamică, care include stres, burnout, productivitate, stare emoțională, energie, satisfacție profesională, echilibru muncă--viață și engagement.
+
+Aplicația este construită ca instrument exploratoriu. Scopul ei nu este să demonstreze relații organizaționale reale, ci să permită observarea unor dinamici sintetice generate de un model configurabil. Astfel, rezultatele trebuie interpretate ca ieșiri ale modelului, nu ca date empirice.
+
+Interfața permite configurarea parametrilor, rularea simulării, vizualizarea graficelor, compararea scenariilor și exportul rezultatelor pentru folosire ulterioară în raport.
+
+\section{Funcționalități implementate}
+
+Prototipul include următoarele funcționalități principale:
+
+\begin{itemize}
+    \item configurarea numărului de agenți, a numărului de zile simulate și a seed-ului aleator;
+    \item presetări factory pentru scenarii organizaționale predefinite;
+    \item presetări locale definite de utilizator, salvate în \texttt{user\_presets.json};
+    \item buton explicit de aplicare a presetării, pentru a evita modificarea accidentală a parametrilor;
+    \item salvarea configurației curente ca presetare nouă;
+    \item controale sticky pentru rulare, pauză/reluare și curățarea rezultatului afișat;
+    \item editarea intervalelor vizibile ale sliderelor prin panoul \textit{Advanced slider ranges};
+    \item grafice live pentru stres, burnout, productivitate și indicatori secundari;
+    \item mod de comparare a scenariilor folosind același seed;
+    \item istoric de rulări finalizate în pagina de export;
+    \item căutare în istoricul de export după scenariu, timestamp, seed, zi, număr de agenți sau ID;
+    \item export în formate JSON, CSV, TXT, PNG și ZIP;
+    \item scripturi de pornire pentru Unix/macOS și Windows: \texttt{run.sh} și \texttt{run.bat}.
+\end{itemize}
+
+\section{Modelul de simulare}
+
+Fiecare pas al simulării reprezintă o zi de lucru simulată. La fiecare zi, modelul aplică factori organizaționali, factori personali, influență socială, evenimente aleatoare și reguli de actualizare a stării fiecărui agent.
+
+\subsection{Variabile dinamice}
+
+Agenții au următoarele variabile dinamice principale:
+
+\begin{itemize}
+    \item \textbf{stress}: nivelul de stres, normalizat între 0 și 1;
+    \item \textbf{burnout}: acumularea burnout-ului, normalizată între 0 și 1;
+    \item \textbf{productivity}: productivitatea curentă, normalizată între 0 și 1;
+    \item \textbf{emotion}: starea emoțională, între -1 și 1;
+    \item \textbf{energy}: energia sau capacitatea de recuperare, între 0 și 1;
+    \item \textbf{satisfaction}: satisfacția profesională, între 0 și 1;
+    \item \textbf{work\_life\_balance}: echilibrul muncă--viață, între 0 și 1;
+    \item \textbf{engagement}: implicarea agentului în muncă, între 0 și 1.
+\end{itemize}
+
+\subsection{Factori statici}
+
+Fiecare agent este inițializat cu trăsături personale diferite: rol, reziliență, ambiție, nevoie de suport social, sensibilitate la navetă, încărcătură familială, variabilitate a sănătății, productivitate de bază, sensibilitate la stres și rată de recuperare.
+
+\subsection{Logica generală}
+
+Modelul folosește ecuații simple și transparente. Stresul crește în funcție de cerințe de lucru, presiune externă și evenimente negative, dar scade în funcție de resurse, recuperare și reziliență. Burnout-ul se acumulează mai lent decât stresul și este influențat de stres ridicat pe termen mai lung. Productivitatea nu este modelată ca o relație liniară de tipul ``stresul este mereu rău''. Există un efect de presiune optimă: stresul moderat poate susține productivitatea, în timp ce stresul ridicat și burnout-ul o reduc.
+
+\subsection{Turnover}
+
+În aplicație, \textit{turnover} înseamnă numărul cumulat de angajați simulați care părăsesc organizația. Plecarea unui agent poate apărea atunci când nivelul de burnout sau stres depășește pragurile configurate. Dacă înlocuirea este activă, un nou agent intră după o întârziere configurată și are temporar o penalizare de productivitate din cauza onboarding-ului.
+
+\subsection{Reproductibilitate}
+
+Simularea folosește \texttt{numpy.random.default\_rng(seed)}. Același seed și aceeași configurație duc la aceeași serie de rezultate. Această proprietate este importantă pentru compararea scenariilor în condiții controlate.
+
+\section{Implementare tehnică}
+
+Aplicația este implementată în Python. Interfața web este realizată cu Streamlit, iar calculele numerice sunt realizate cu NumPy. Datele sunt organizate și exportate folosind Pandas, iar graficele exportabile sunt generate cu Matplotlib. Pentru grafice interactive în dashboard se folosește Plotly, dacă este disponibil.
+
+\subsection{Structura proiectului}
+
+\begin{verbatim}
+app.py
+run.sh
+run.bat
+simulation/
+  config.py
+  agent.py
+  engine.py
+  scenarios.py
+  metrics.py
+  exports.py
+  utils.py
+exports/
+requirements.txt
+\end{verbatim}
+
+\subsection{Alegerea motorului custom}
+
+Pentru acest prototip a fost folosită o implementare custom, ușoară, a motorului de simulare agent-based. O librărie dedicată, precum Mesa, ar fi putut fi folosită, dar pentru scopul prototipului ar fi adăugat complexitate suplimentară fără un beneficiu imediat proporțional. Implementarea custom a permis control direct asupra ecuațiilor, structurii agenților și formatului exporturilor.
+
+\section{Scenarii și rezultate}
+\label{sec:rezultate}
+
+Această secțiune este un schelet care va fi completat după rularea scenariilor finale și exportul graficelor.
+
+\subsection{Configurația experimentală}
+
+\begin{itemize}
+    \item Număr agenți: \textit{[de completat]}
+    \item Număr zile simulate: \textit{[de completat]}
+    \item Seed folosit: \textit{[de completat]}
+    \item Scenarii comparate: \textit{[de completat]}
+    \item Parametri modificați față de presetări: \textit{[de completat]}
+\end{itemize}
+
+\subsection{Tabel comparativ}
+
+\begin{table}[h]
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lrrrrr}
+        \toprule
+        Scenariu & Stres final & Burnout final & Productivitate finală & Turnover & Burnout cumulativ \\
+        \midrule
+        \textit{[Scenariu 1]} & -- & -- & -- & -- & -- \\
+        \textit{[Scenariu 2]} & -- & -- & -- & -- & -- \\
+        \textit{[Scenariu 3]} & -- & -- & -- & -- & -- \\
+        \bottomrule
+    \end{tabular}
+    }
+    \caption{Rezultate sintetice comparative obținute din simulările AWDS.}
+\end{table}
+
+\subsection{Grafice}
+
+Inserați aici graficele exportate din aplicație.
+
+\begin{figure}[h]
+    \centering
+    % \includegraphics[width=0.9\textwidth]{figures/nume_grafic_timeseries.png}
+    \fbox{\parbox{0.85\textwidth}{\centering Placeholder pentru graficul stres--burnout--productivitate.}}
+    \caption{Evoluția stresului, burnout-ului și productivității pentru scenariul \textit{[de completat]}.}
+\end{figure}
+
+\subsection{Interpretare}
+
+\textit{[De completat după rularea scenariilor finale. Interpretarea trebuie formulată ca dinamică sintetică a modelului, nu ca rezultat empiric.]}
+
+\section{Dificultăți întâmpinate}
+
+Principala dificultate a fost proiectarea unui model suficient de expresiv încât să nu reducă dinamica organizațională la reguli triviale de tipul ``stresul este rău'' și ``timpul liber este bun''. Pentru ca simularea să fie utilă, modelul trebuia să permită situații mai nuanțate: de exemplu, un nivel moderat de presiune poate crește productivitatea pe termen scurt, dar presiunea ridicată și susținută poate duce la burnout și scăderea productivității.
+
+O altă dificultate a fost balansarea parametrilor astfel încât scenariile să producă diferențe vizibile, dar fără ca toate rulările să ajungă imediat în extreme. A fost necesară separarea între stres, burnout, energie, satisfacție și productivitate, deoarece aceste variabile nu se mișcă toate cu aceeași viteză și nu răspund identic la aceiași factori.
+
+Configurabilitatea interfeței a reprezentat o provocare practică, deoarece numărul de parametri este mare. Streamlit a simplificat semnificativ partea de UI, permițând construirea rapidă a panourilor de configurare, graficelor și controalelor. Totuși, a fost nevoie de organizarea clară a controalelor, presetări explicite, explicații pentru parametri și un sistem de export ușor de folosit.
+
+Exportul rezultatelor a fost tratat ca parte a experienței de utilizare: utilizatorul trebuie să poată reveni la rulări, să le caute, să identifice fiecare rulare prin ID și timestamp și să descarce datele în formate potrivite pentru raport.
+
+\section{Limitări}
+
+Cea mai importantă limitare este faptul că modelul folosește date sintetice. Parametrii și ecuațiile sunt configurabile și reproductibile, dar nu sunt calibrate pe date empirice reale. Din acest motiv, rezultatele pot fi folosite pentru a discuta comportamentul intern al modelului, nu pentru a trage concluzii despre companii reale.
+
+Modelul simplifică multe aspecte ale mediului organizațional: relațiile sociale sunt reprezentate printr-o rețea statică, evenimentele sunt modelate probabilistic, iar trăsăturile agenților sunt generate aleator din distribuții simple. Aceste decizii sunt potrivite pentru un prototip, dar limitează realismul simulării.
+
+\section{Direcții viitoare}
+
+Următorul pas important ar fi obținerea unor date empirice pentru calibrarea modelului. O direcție posibilă este crearea unui formular distribuit persoanelor din companii diferite, prin care să fie colectate informații despre stres perceput, volum de lucru, suport managerial, autonomie, echilibru muncă--viață, satisfacție și intenția de a părăsi organizația.
+
+Scopul unui astfel de formular ar fi să permită transformarea unor experiențe subiective în valori aproximative, adică să se poată ``pune un număr pe o senzație''. Aceste valori ar putea fi folosite pentru ajustarea parametrilor modelului, compararea scenariilor sintetice cu răspunsuri reale și identificarea variabilelor care trebuie reprezentate mai bine.
+
+Alte direcții de dezvoltare includ:
+
+\begin{itemize}
+    \item calibrarea parametrilor pe baza răspunsurilor colectate;
+    \item extinderea modelului cu echipe, departamente și roluri organizaționale mai detaliate;
+    \item analiza de sensibilitate pentru a vedea ce parametri influențează cel mai mult rezultatele;
+    \item salvarea persistentă a rulărilor într-o bază de date;
+    \item îmbunătățirea vizualizărilor și a rapoartelor exportate automat;
+    \item validarea parțială a modelului prin compararea tendințelor sintetice cu date reale anonimizate.
+\end{itemize}
+
+\section{Demo video}
+
+Demo-ul video va prezenta fluxul principal al aplicației:
+
+\begin{enumerate}
+    \item pornirea aplicației;
+    \item aplicarea unei presetări factory;
+    \item ajustarea manuală a unor parametri;
+    \item salvarea unei presetări locale;
+    \item rularea unei simulări;
+    \item pauză/reluarea unei rulări live;
+    \item compararea mai multor scenarii;
+    \item exportul rezultatelor dintr-un drawer de export;
+    \item descărcarea fișierelor JSON, CSV, TXT, PNG și ZIP.
+\end{enumerate}
+
+Link demo video: \textit{[de completat]}
+
+\end{document}
