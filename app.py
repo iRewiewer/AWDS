@@ -426,6 +426,7 @@ def initialise_state() -> None:
     st.session_state.setdefault("active_run_status", "idle")
     st.session_state.setdefault("active_run_id", None)
     st.session_state.setdefault("engine_mode", ENGINE_CUSTOM)
+    st.session_state.setdefault("comparison_engine_mode", ENGINE_CUSTOM)
 
     for field_name, definition in SLIDER_DEFINITIONS.items():
         min_key = slider_range_key(field_name, "min")
@@ -1011,8 +1012,14 @@ def render_distribution_charts(result: dict[str, Any]) -> None:
 
 def render_comparison_tab(config: SimulationConfig) -> None:
     st.subheader("Scenario comparison")
-    engine_names = selected_engine_names(st.session_state.get("engine_mode", ENGINE_CUSTOM))
-    st.caption("Comparison uses the same seed, run controls, and selected simulation engine setting for each preset.")
+    st.selectbox(
+        "Comparison engine",
+        ENGINE_OPTIONS,
+        key="comparison_engine_mode",
+        help=FIELD_HELP["engine_mode"],
+    )
+    engine_names = selected_engine_names(st.session_state.get("comparison_engine_mode", ENGINE_CUSTOM))
+    st.caption("Comparison uses the same seed, run controls, and selected comparison engine for each preset.")
     user_presets = load_user_presets()
     all_options = [f"Factory: {name}" for name in PRESET_SCENARIOS] + [f"User: {name}" for name in user_presets]
     default_scenarios = [
