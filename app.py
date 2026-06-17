@@ -11,7 +11,7 @@ import pandas as pd
 import streamlit as st
 
 from simulation.config import MANAGEMENT_STYLES, WORK_POLICIES, SimulationConfig
-from simulation.engine import SimulationEngine
+from simulation.engines import ENGINE_ALL, ENGINE_CUSTOM, ENGINE_OPTIONS, EngineLike, create_engine, selected_engine_names
 from simulation.exports import save_export_bundle
 from simulation.scenarios import PRESET_SCENARIOS, get_scenario_config
 from simulation.utils import slugify
@@ -340,7 +340,8 @@ SLIDER_DEFINITIONS: dict[str, dict[str, Any]] = {
 FIELD_HELP: dict[str, str] = {
     "num_agents": "Number of employee agents simulated.",
     "num_days": "Number of simulated workdays. Higher values take longer but let slow burnout dynamics emerge.",
-    "random_seed": "Reproducibility seed. Same seed plus same settings gives the same result.",
+    "random_seed": "Reproducibility seed. Same seed, engine, and settings give the same result.",
+    "engine_mode": "Choose the custom NumPy engine, the Mesa-native engine, or run both engines sequentially for comparison.",
     "run_live": "When enabled, the dashboard advances in chunks and updates charts while the run is in progress.",
     "collect_per_agent_history": "Stores every agent state at every day for raw exports. This can get large.",
     "enable_emotional_contagion": "Allows emotion to spread through colleague relationships.",
@@ -420,9 +421,12 @@ def initialise_state() -> None:
     st.session_state.setdefault("run_history", [])
     st.session_state.setdefault("export_history", {})
     st.session_state.setdefault("latest_result", None)
+    st.session_state.setdefault("latest_result_group", [])
     st.session_state.setdefault("active_engine", None)
     st.session_state.setdefault("active_run_status", "idle")
     st.session_state.setdefault("active_run_id", None)
+    st.session_state.setdefault("engine_mode", ENGINE_CUSTOM)
+    st.session_state.setdefault("comparison_engine_mode", ENGINE_CUSTOM)
 
     for field_name, definition in SLIDER_DEFINITIONS.items():
         min_key = slider_range_key(field_name, "min")
@@ -438,11 +442,19 @@ def render_sidebar() -> tuple[SimulationConfig, dict[str, bool]]:
     actions = render_action_panel()
 
     with st.sidebar.expander("Simulation controls", expanded=True):
+        st.selectbox(
+            "Simulation engine",
+            ENGINE_OPTIONS,
+            key="engine_mode",
+            help=FIELD_HELP["engine_mode"],
+        )
         number_input_config("Number of agents", "num_agents", min_value=5, step=5, help_text=FIELD_HELP["num_agents"])
         number_input_config("Number of simulated days", "num_days", min_value=1, step=30, help_text=FIELD_HELP["num_days"])
         number_input_config("Random seed", "random_seed", min_value=0, max_value=2_147_483_647, step=1, help_text=FIELD_HELP["random_seed"])
         config_slider("refresh_interval")
         checkbox_config("Run live", "run_live", FIELD_HELP["run_live"])
+        if st.session_state.get("engine_mode") == ENGINE_ALL:
+            st.caption("All engines mode runs Custom and Mesa sequentially; live pause/resume is disabled for that run.")
         checkbox_config("Collect per-agent history", "collect_per_agent_history", FIELD_HELP["collect_per_agent_history"])
         checkbox_config("Enable emotional contagion", "enable_emotional_contagion", FIELD_HELP["enable_emotional_contagion"])
         checkbox_config("Enable turnover", "enable_turnover", FIELD_HELP["enable_turnover"])
@@ -684,20 +696,29 @@ def process_sidebar_actions(config: SimulationConfig, actions: dict[str, bool]) 
         st.rerun()
     if actions["clear"]:
         st.session_state.latest_result = None
+        st.session_state.latest_result_group = []
         st.session_state.export_history = {}
 
 
 def start_run(config: SimulationConfig) -> None:
-    if config.run_live:
-        engine = SimulationEngine(config)
+    engine_names = selected_engine_names(st.session_state.get("engine_mode", ENGINE_CUSTOM))
+    if config.run_live and len(engine_names) == 1:
+        engine = create_engine(config, engine_names[0])
+        snapshot = engine.snapshot()
         st.session_state.active_engine = engine
         st.session_state.active_run_status = "running"
-        st.session_state.active_run_id = make_run_id(engine.snapshot())
-        st.session_state.latest_result = engine.snapshot()
+        st.session_state.active_run_id = make_run_id(snapshot)
+        st.session_state.latest_result = snapshot
+        st.session_state.latest_result_group = [snapshot]
     else:
-        with st.spinner("Running synthetic simulation..."):
-            result = SimulationEngine(config).run()
-        store_completed_run(result)
+        run_config = config.with_overrides(run_live=False) if len(engine_names) > 1 else config
+        st.session_state.active_run_id = None
+        with st.spinner(run_spinner_text(engine_names)):
+            results = [create_engine(run_config, engine_name).run() for engine_name in engine_names]
+        for result in results:
+            store_completed_run(result, update_latest=False)
+        st.session_state.latest_result = results[-1] if results else None
+        st.session_state.latest_result_group = results
         st.session_state.active_engine = None
         st.session_state.active_run_status = "idle"
         st.session_state.active_run_id = None
@@ -708,18 +729,23 @@ def render_run_tab(config: SimulationConfig) -> None:
     if active_engine is not None and st.session_state.get("active_run_status") == "running":
         advance_live_run(active_engine)
 
-    result_for_header = st.session_state.get("latest_result")
+    latest_group = latest_results()
+    result_for_header = latest_group[0] if latest_group else st.session_state.get("latest_result")
     header_config = result_for_header.get("config", {}) if result_for_header else config.to_dict()
     scenario = result_for_header.get("scenario_name", config.scenario_name) if result_for_header else config.scenario_name
+    engine_label = engine_group_label(latest_group) if latest_group else st.session_state.get("engine_mode", ENGINE_CUSTOM)
 
-    top_cols = st.columns([2, 1, 1, 1])
+    top_cols = st.columns([2, 1, 1, 1, 1])
     top_cols[0].subheader(scenario)
     top_cols[1].metric("Seed", header_config.get("random_seed", config.random_seed))
     top_cols[2].metric("Days", header_config.get("num_days", config.num_days))
-    top_cols[3].metric("Run status", st.session_state.get("active_run_status", "idle").title())
+    top_cols[3].metric("Engine", engine_label)
+    top_cols[4].metric("Run status", st.session_state.get("active_run_status", "idle").title())
 
     latest_result = st.session_state.get("latest_result")
-    if latest_result:
+    if len(latest_group) > 1:
+        render_engine_group_dashboard(latest_group)
+    elif latest_result:
         render_result_dashboard(latest_result)
     else:
         st.write("Apply a preset or adjust parameters in the sidebar, then run the simulation.")
@@ -731,7 +757,7 @@ def render_run_tab(config: SimulationConfig) -> None:
         st.rerun()
 
 
-def advance_live_run(engine: SimulationEngine) -> None:
+def advance_live_run(engine: EngineLike) -> None:
     days_remaining = max(0, engine.config.num_days - engine.current_day)
     if days_remaining == 0:
         finish_live_run(engine.result())
@@ -741,15 +767,104 @@ def advance_live_run(engine: SimulationEngine) -> None:
     for _ in range(min(steps_per_render, days_remaining)):
         snapshot = engine.step()
     st.session_state.latest_result = snapshot
+    st.session_state.latest_result_group = [snapshot]
     if engine.current_day >= engine.config.num_days:
         finish_live_run(engine.result())
 
 
 def finish_live_run(result: dict[str, Any]) -> None:
     store_completed_run(result)
+    st.session_state.latest_result_group = [result]
     st.session_state.active_engine = None
     st.session_state.active_run_status = "idle"
     st.session_state.active_run_id = None
+
+
+def run_spinner_text(engine_names: tuple[str, ...]) -> str:
+    if len(engine_names) == 1:
+        return f"Running synthetic simulation ({engine_names[0]})..."
+    return "Running Custom and Mesa simulations..."
+
+
+def latest_results() -> list[dict[str, Any]]:
+    group = st.session_state.get("latest_result_group") or []
+    return [result for result in group if isinstance(result, dict)]
+
+
+def engine_group_label(results: list[dict[str, Any]]) -> str:
+    engines = [result_engine(result) for result in results]
+    return " + ".join(engines) if engines else st.session_state.get("engine_mode", ENGINE_CUSTOM)
+
+
+def result_engine(result: dict[str, Any]) -> str:
+    engine = result.get("engine")
+    return str(engine) if engine else ENGINE_CUSTOM
+
+
+def render_engine_group_dashboard(results: list[dict[str, Any]]) -> None:
+    st.subheader("Engine comparison")
+    rows = []
+    for result in results:
+        summary = result.get("final_summary", {})
+        rows.append(
+            {
+                "engine": result_engine(result),
+                "final_average_stress": summary.get("final_average_stress"),
+                "final_average_burnout": summary.get("final_average_burnout"),
+                "final_average_productivity": summary.get("final_average_productivity"),
+                "total_turnover": summary.get("total_turnover"),
+                "lowest_productivity": summary.get("lowest_productivity"),
+            }
+        )
+    st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+    render_engine_overlay_chart(results)
+
+    labels = [f"{result_engine(result)} detail" for result in results]
+    if st.session_state.get("latest_engine_detail") not in labels:
+        st.session_state.latest_engine_detail = labels[0]
+    selected_label = st.selectbox("Detailed result", labels, key="latest_engine_detail")
+    selected_result = results[labels.index(selected_label)]
+    render_result_dashboard(selected_result)
+
+
+def render_engine_overlay_chart(results: list[dict[str, Any]]) -> None:
+    if not PLOTLY_AVAILABLE:
+        return
+
+    fig = go.Figure()
+    colors = {
+        "average_stress": "#d95f02",
+        "average_burnout": "#7570b3",
+        "average_productivity": "#1b9e77",
+    }
+    dashes = ["solid", "dash", "dot", "dashdot"]
+    for index, result in enumerate(results):
+        df = aggregate_df(result)
+        if df.empty:
+            continue
+        for column, label in [
+            ("average_stress", "Stress"),
+            ("average_burnout", "Burnout"),
+            ("average_productivity", "Productivity"),
+        ]:
+            fig.add_trace(
+                go.Scatter(
+                    x=df["day"],
+                    y=df[column],
+                    mode="lines",
+                    name=f"{result_engine(result)} {label}",
+                    line=dict(color=colors[column], width=3, dash=dashes[index % len(dashes)]),
+                )
+            )
+    fig.update_layout(
+        title="Engine overlay",
+        yaxis=dict(range=[0, 1]),
+        xaxis_title="Day",
+        yaxis_title="Normalized value",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        margin=dict(l=20, r=20, t=70, b=20),
+    )
+    st.plotly_chart(fig, width="stretch", key="engine_overlay_chart")
 
 
 def render_result_dashboard(result: dict[str, Any]) -> None:
@@ -897,7 +1012,14 @@ def render_distribution_charts(result: dict[str, Any]) -> None:
 
 def render_comparison_tab(config: SimulationConfig) -> None:
     st.subheader("Scenario comparison")
-    st.caption("Comparison uses the same seed and run controls for each selected preset.")
+    st.selectbox(
+        "Comparison engine",
+        ENGINE_OPTIONS,
+        key="comparison_engine_mode",
+        help=FIELD_HELP["engine_mode"],
+    )
+    engine_names = selected_engine_names(st.session_state.get("comparison_engine_mode", ENGINE_CUSTOM))
+    st.caption("Comparison uses the same seed, run controls, and selected comparison engine for each preset.")
     user_presets = load_user_presets()
     all_options = [f"Factory: {name}" for name in PRESET_SCENARIOS] + [f"User: {name}" for name in user_presets]
     default_scenarios = [
@@ -917,8 +1039,10 @@ def render_comparison_tab(config: SimulationConfig) -> None:
             st.warning("Select at least one scenario.")
         else:
             comparison_rows = []
+            total_runs = len(selected) * len(engine_names)
+            completed_runs = 0
             progress = st.progress(0, text="Starting comparison")
-            for index, preset_label in enumerate(selected, start=1):
+            for preset_label in selected:
                 scenario_config = config_for_preset_label(preset_label, config, user_presets)
                 scenario_config = scenario_config.with_overrides(
                     num_agents=config.num_agents,
@@ -931,20 +1055,26 @@ def render_comparison_tab(config: SimulationConfig) -> None:
                     replace_after_turnover=config.replace_after_turnover,
                     enable_random_life_events=config.enable_random_life_events,
                 )
-                result = SimulationEngine(scenario_config).run()
-                summary = result["final_summary"]
-                comparison_rows.append(
-                    {
-                        "scenario": preset_label,
-                        "final_average_burnout": summary["final_average_burnout"],
-                        "final_average_stress": summary["final_average_stress"],
-                        "final_average_productivity": summary["final_average_productivity"],
-                        "total_turnover": summary["total_turnover"],
-                        "cumulative_burnout_auc": summary["cumulative_burnout"],
-                        "lowest_productivity": summary["lowest_productivity"],
-                    }
-                )
-                progress.progress(index / len(selected), text=f"Completed {preset_label}")
+                for engine_name in engine_names:
+                    result = create_engine(scenario_config, engine_name).run()
+                    summary = result["final_summary"]
+                    comparison_rows.append(
+                        {
+                            "scenario": preset_label,
+                            "engine": result_engine(result),
+                            "final_average_burnout": summary["final_average_burnout"],
+                            "final_average_stress": summary["final_average_stress"],
+                            "final_average_productivity": summary["final_average_productivity"],
+                            "total_turnover": summary["total_turnover"],
+                            "cumulative_burnout_auc": summary["cumulative_burnout"],
+                            "lowest_productivity": summary["lowest_productivity"],
+                        }
+                    )
+                    completed_runs += 1
+                    progress.progress(
+                        completed_runs / total_runs,
+                        text=f"Completed {preset_label} ({engine_name})",
+                    )
             comparison_df = pd.DataFrame(comparison_rows)
             st.session_state.comparison_result = comparison_df
             progress.progress(1.0, text="Comparison complete")
@@ -964,8 +1094,15 @@ def render_comparison_tab(config: SimulationConfig) -> None:
                     "lowest_productivity",
                 ],
             )
-            fig = px.bar(comparison_df, x="scenario", y=metric, color="scenario", title=metric.replace("_", " ").title())
-            fig.update_layout(showlegend=False, xaxis_title="", yaxis_title=metric.replace("_", " ").title())
+            fig = px.bar(
+                comparison_df,
+                x="scenario",
+                y=metric,
+                color="engine",
+                barmode="group",
+                title=metric.replace("_", " ").title(),
+            )
+            fig.update_layout(xaxis_title="", yaxis_title=metric.replace("_", " ").title())
             st.plotly_chart(fig, width="stretch", key="comparison_bar")
         else:
             st.bar_chart(comparison_df.set_index("scenario"))
@@ -1003,11 +1140,12 @@ def render_export_run_drawer(entry: dict[str, Any], expanded: bool = False) -> N
         st.caption("Run ID")
         st.code(entry["id"])
 
-        meta_cols = st.columns(4)
+        meta_cols = st.columns(5)
         meta_cols[0].metric("Seed", result.get("seed", config.get("random_seed", "n/a")))
         meta_cols[1].metric("Days", summary.get("final_day", config.get("num_days", "n/a")))
         meta_cols[2].metric("Agents", config.get("num_agents", "n/a"))
-        meta_cols[3].metric("Scenario", result.get("scenario_name", "AWDS run"))
+        meta_cols[3].metric("Engine", result_engine(result))
+        meta_cols[4].metric("Scenario", result.get("scenario_name", "AWDS run"))
 
         cols = st.columns(4)
         cols[0].metric("Final stress", format_metric(summary.get("final_average_stress")))
@@ -1072,7 +1210,7 @@ def render_about_tab() -> None:
     )
     st.write(
         "Each simulated day applies organizational policies, personal modifiers, social network effects, "
-        "and random events to every employee agent. The same seed and same configuration produce the same output."
+        "and random events to every employee agent. The same seed, engine, and configuration reproduce the same output."
     )
     st.write(
         "Turnover is the cumulative count of simulated employees who leave after stress or burnout risk crosses "
@@ -1184,19 +1322,22 @@ def delete_user_preset(name: str, user_presets: dict[str, dict[str, Any]]) -> No
     st.session_state.active_preset_label = "Factory: Balanced baseline"
 
 
-def store_completed_run(result: dict[str, Any]) -> None:
+def store_completed_run(result: dict[str, Any], update_latest: bool = True) -> None:
     run_id = st.session_state.get("active_run_id") or make_run_id(result)
     label = make_run_label(result, run_id)
     completed_at = datetime.now().isoformat(timespec="seconds")
     history = [entry for entry in st.session_state.get("run_history", []) if entry["id"] != run_id]
     history.insert(0, {"id": run_id, "label": label, "completed_at": completed_at, "result": result})
     st.session_state.run_history = history[:25]
-    st.session_state.latest_result = result
+    if update_latest:
+        st.session_state.latest_result = result
 
 
 def make_run_id(result: dict[str, Any]) -> str:
     stamp = datetime.now().strftime("%Y%m%d%H%M%S")
-    return f"{slugify(str(result.get('scenario_name', 'awds-run')))}-{result.get('seed', 'seed')}-{stamp}"
+    scenario = slugify(str(result.get("scenario_name", "awds-run")))
+    engine = slugify(result_engine(result))
+    return f"{scenario}-{engine}-seed-{result.get('seed', 'seed')}-{stamp}"
 
 
 def make_run_label(result: dict[str, Any], run_id: str) -> str:
@@ -1204,7 +1345,7 @@ def make_run_label(result: dict[str, Any], run_id: str) -> str:
     scenario = result.get("scenario_name", "AWDS run")
     seed = result.get("seed", "seed")
     day = summary.get("final_day", result.get("config", {}).get("num_days", "?"))
-    return f"{scenario} | seed {seed} | day {day}"
+    return f"{scenario} | {result_engine(result)} | seed {seed} | day {day}"
 
 
 def export_drawer_title(entry: dict[str, Any]) -> str:
@@ -1214,7 +1355,7 @@ def export_drawer_title(entry: dict[str, Any]) -> str:
     seed = result.get("seed", result.get("config", {}).get("random_seed", "n/a"))
     day = summary.get("final_day", result.get("config", {}).get("num_days", "n/a"))
     timestamp = readable_run_timestamp(entry)
-    return f"{scenario} - {timestamp} - seed {seed}, day {day}"
+    return f"{scenario} ({result_engine(result)}) - {timestamp} - seed {seed}, day {day}"
 
 
 def filter_export_history(history: list[dict[str, Any]], search_query: str) -> list[dict[str, Any]]:
@@ -1236,6 +1377,7 @@ def export_entry_search_text(entry: dict[str, Any]) -> str:
         str(entry.get("id", "")),
         str(entry.get("label", "")),
         readable_run_timestamp(entry),
+        result_engine(result),
         str(result.get("scenario_name", "")),
         str(result.get("seed", "")),
         str(summary.get("final_day", "")),
