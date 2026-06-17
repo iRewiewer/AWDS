@@ -15,6 +15,8 @@ from .utils import clamp
 class SimulationEngine:
     """Run an AWDS simulation using only a local NumPy RNG."""
 
+    engine_name = "Custom"
+
     def __init__(self, config: SimulationConfig):
         self.config = config
         self.rng = np.random.default_rng(config.random_seed)
@@ -283,6 +285,7 @@ class SimulationEngine:
     def snapshot(self) -> dict[str, Any]:
         return {
             "project": "Adaptive Workplace Dynamics Simulator",
+            "engine": self.engine_name,
             "scenario_name": self.config.scenario_name,
             "seed": self.config.random_seed,
             "config": self.config.to_dict(),

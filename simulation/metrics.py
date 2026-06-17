@@ -2,14 +2,24 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Protocol, Sequence
 
-from .agent import EmployeeAgent
 from .utils import safe_mean
 
 
+class AgentMetricsLike(Protocol):
+    active: bool
+    stress: float
+    burnout: float
+    productivity: float
+    emotion: float
+    energy: float
+    satisfaction: float
+    work_life_balance: float
+
+
 def aggregate_agent_metrics(
-    agents: list[EmployeeAgent],
+    agents: Sequence[AgentMetricsLike],
     day: int,
     burnout_threshold: float,
     turnover_count: int,
