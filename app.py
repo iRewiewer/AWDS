@@ -340,8 +340,8 @@ SLIDER_DEFINITIONS: dict[str, dict[str, Any]] = {
 FIELD_HELP: dict[str, str] = {
     "num_agents": "Number of employee agents simulated.",
     "num_days": "Number of simulated workdays. Higher values take longer but let slow burnout dynamics emerge.",
-    "random_seed": "Reproducibility seed. Same seed plus same settings gives the same result.",
-    "engine_mode": "Choose the custom NumPy engine, the Mesa-backed engine, or run both engines sequentially for comparison.",
+    "random_seed": "Reproducibility seed. Same seed, engine, and settings give the same result.",
+    "engine_mode": "Choose the custom NumPy engine, the Mesa-native engine, or run both engines sequentially for comparison.",
     "run_live": "When enabled, the dashboard advances in chunks and updates charts while the run is in progress.",
     "collect_per_agent_history": "Stores every agent state at every day for raw exports. This can get large.",
     "enable_emotional_contagion": "Allows emotion to spread through colleague relationships.",
@@ -1203,7 +1203,7 @@ def render_about_tab() -> None:
     )
     st.write(
         "Each simulated day applies organizational policies, personal modifiers, social network effects, "
-        "and random events to every employee agent. The same seed and same configuration produce the same output."
+        "and random events to every employee agent. The same seed, engine, and configuration reproduce the same output."
     )
     st.write(
         "Turnover is the cumulative count of simulated employees who leave after stress or burnout risk crosses "
