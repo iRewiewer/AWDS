@@ -55,7 +55,9 @@ Prototipul include următoarele funcționalități principale:
     \item controale sticky pentru rulare, pauză/reluare și curățarea rezultatului afișat;
     \item editarea intervalelor vizibile ale sliderelor prin panoul \textit{Advanced slider ranges};
     \item grafice live pentru stres, burnout, productivitate și indicatori secundari;
-    \item mod de comparare a scenariilor folosind același seed;
+    \item selector de motor pentru motorul custom, motorul Mesa sau ambele motoare rulate pe rând;
+    \item mod de comparare a scenariilor folosind același seed și un motor de comparație selectat;
+    \item comparație directă între ieșirile motoarelor atunci când sunt selectate ambele;
     \item istoric de rulări finalizate în pagina de export;
     \item căutare în istoricul de export după scenariu, timestamp, seed, zi, număr de agenți sau ID;
     \item export în formate JSON, CSV, TXT, PNG și ZIP;
@@ -95,11 +97,11 @@ Modelul folosește ecuații simple și transparente. Stresul crește în funcți
 
 \subsection{Reproductibilitate}
 
-Simularea folosește \texttt{numpy.random.default\_rng(seed)}. Același seed și aceeași configurație duc la aceeași serie de rezultate. Această proprietate este importantă pentru compararea scenariilor în condiții controlate.
+Motorul custom folosește \texttt{numpy.random.default\_rng(seed)}, iar motorul Mesa primește același seed configurat prin modelul Mesa. Același seed, aceeași configurație și același motor selectat duc la aceeași serie de rezultate pentru acel motor. Același seed nu este așteptat să producă traiectorii identice între motorul custom și motorul Mesa, deoarece implementarea și ordinea de activare sunt diferite. Această proprietate este utilă pentru compararea scenariilor în condiții controlate și pentru compararea stabilității tendințelor observate între implementări.
 
 \section{Implementare tehnică}
 
-Aplicația este implementată în Python. Interfața web este realizată cu Streamlit, iar calculele numerice sunt realizate cu NumPy. Datele sunt organizate și exportate folosind Pandas, iar graficele exportabile sunt generate cu Matplotlib. Pentru grafice interactive în dashboard se folosește Plotly, dacă este disponibil.
+Aplicația este implementată în Python. Interfața web este realizată cu Streamlit, iar calculele numerice sunt realizate cu NumPy. Datele sunt organizate și exportate folosind Pandas, iar graficele exportabile sunt generate cu Matplotlib. Pentru grafice interactive în dashboard se folosește Plotly, dacă este disponibil. Implementarea Mesa folosește clasele de model și agent din Mesa împreună cu un spațiu de rețea bazat pe NetworkX.
 
 \subsection{Structura proiectului}
 
@@ -111,6 +113,8 @@ simulation/
   config.py
   agent.py
   engine.py
+  mesa_engine.py
+  engines.py
   scenarios.py
   metrics.py
   exports.py
@@ -119,14 +123,24 @@ exports/
 requirements.txt
 \end{verbatim}
 
-\subsection{Alegerea motorului custom}
+\subsection{Arhitectura motoarelor de simulare}
 
-Pentru acest prototip a fost folosită o implementare custom, ușoară, a motorului de simulare agent-based. O librărie dedicată, precum Mesa, ar fi putut fi folosită, dar pentru scopul prototipului ar fi adăugat complexitate suplimentară fără un beneficiu imediat proporțional. Implementarea custom a permis control direct asupra ecuațiilor, structurii agenților și formatului exporturilor.
+Prototipul separă acum logica de simulare în spatele unei interfețe de motor. Un motor expune aceleași operații de bază: avansarea cu o zi, rularea până la final, întoarcerea unui snapshot live și întoarcerea rezultatului final. Dashboard-ul folosește \texttt{engines.py} pentru a mapa numele motorului selectat la implementarea care trebuie rulată. Astfel, interfața nu depinde de implementarea exactă a motorului.
+
+Motorul custom, implementat în \texttt{engine.py}, este o implementare locală, ușoară. El gestionează direct lista de agenți angajați, rețeaua socială, evenimentele aleatoare, actualizările zilnice ale stării, turnover-ul, înlocuirea angajaților și metricile agregate. Avantajul principal este transparența: ecuațiile de actualizare și formatul ieșirilor sunt ușor de inspectat și ajustat.
+
+\subsection{Alternativa Mesa}
+
+Mesa a fost adăugat ca motor alternativ în \texttt{mesa\_engine.py}. În această versiune, mediul de lucru este reprezentat ca model Mesa, angajații sunt agenți Mesa, iar relațiile sunt stocate într-un network grid bazat pe NetworkX. Motorul Mesa păstrează aceleași câmpuri de rezultat ca motorul custom, astfel încât dashboard-ul, exporturile și tabelele comparative pot trata uniform ambele motoare.
+
+Scopul adăugării Mesa nu este obținerea unor rezultate identice. Scopul este compararea tendințelor scenariilor în două implementări. Dacă motorul custom și motorul Mesa arată direcții similare pentru aceeași presetare, același seed și aceleași controale de rulare, comportamentul modelului devine mai ușor de interpretat. Dacă ieșirile diferă, diferența ajută la identificarea ipotezelor sau detaliilor de implementare care trebuie cercetate mai atent.
 
 \section{Scenarii și rezultate}
 \label{sec:rezultate}
 
 Această secțiune este un schelet care va fi completat după rularea scenariilor finale și exportul graficelor.
+
+Fluxul de comparație este central pentru prototip. Scenariile pot fi comparate cu motorul custom, cu motorul Mesa sau cu ambele motoare. Astfel se obține o imagine mai clară asupra întrebării de cercetare: dacă efectul observat ține de scenariu sau de diferențele introduse de motorul de simulare.
 
 \subsection{Configurația experimentală}
 
@@ -134,22 +148,23 @@ Această secțiune este un schelet care va fi completat după rularea scenariilo
     \item Număr agenți: \textit{[de completat]}
     \item Număr zile simulate: \textit{[de completat]}
     \item Seed folosit: \textit{[de completat]}
+    \item Motor sau motoare comparate: \textit{[de completat]}
     \item Scenarii comparate: \textit{[de completat]}
     \item Parametri modificați față de presetări: \textit{[de completat]}
 \end{itemize}
 
 \subsection{Tabel comparativ}
 
-\begin{table}[h]
+\begin{table}[ht]
     \centering
     \resizebox{\textwidth}{!}{%
-    \begin{tabular}{lrrrrr}
+    \begin{tabular}{llrrrrr}
         \toprule
-        Scenariu & Stres final & Burnout final & Productivitate finală & Turnover & Burnout cumulativ \\
+        Scenariu & Motor & Stres final & Burnout final & Productivitate finală & Turnover & Burnout cumulativ \\
         \midrule
-        \textit{[Scenariu 1]} & -- & -- & -- & -- & -- \\
-        \textit{[Scenariu 2]} & -- & -- & -- & -- & -- \\
-        \textit{[Scenariu 3]} & -- & -- & -- & -- & -- \\
+        \textit{[Scenariu 1]} & \textit{[Motor]} & -- & -- & -- & -- & -- \\
+        \textit{[Scenariu 2]} & \textit{[Motor]} & -- & -- & -- & -- & -- \\
+        \textit{[Scenariu 3]} & \textit{[Motor]} & -- & -- & -- & -- & -- \\
         \bottomrule
     \end{tabular}
     }
@@ -160,7 +175,7 @@ Această secțiune este un schelet care va fi completat după rularea scenariilo
 
 Inserați aici graficele exportate din aplicație.
 
-\begin{figure}[h]
+\begin{figure}[ht]
     \centering
     % \includegraphics[width=0.9\textwidth]{figures/nume_grafic_timeseries.png}
     \fbox{\parbox{0.85\textwidth}{\centering Placeholder pentru graficul stres--burnout--productivitate.}}
@@ -169,7 +184,7 @@ Inserați aici graficele exportate din aplicație.
 
 \subsection{Interpretare}
 
-\textit{[De completat după rularea scenariilor finale. Interpretarea trebuie formulată ca dinamică sintetică a modelului, nu ca rezultat empiric.]}
+\textit{[De completat după rularea scenariilor finale. Interpretarea trebuie formulată ca dinamică sintetică a modelului, trebuie să compare tendințele custom și Mesa atunci când sunt folosite ambele motoare și nu trebuie prezentată ca rezultat empiric.]}
 
 \section{Dificultăți întâmpinate}
 
@@ -180,6 +195,8 @@ O altă dificultate a fost balansarea parametrilor astfel încât scenariile să
 Configurabilitatea interfeței a reprezentat o provocare practică, deoarece numărul de parametri este mare. Streamlit a simplificat semnificativ partea de UI, permițând construirea rapidă a panourilor de configurare, graficelor și controalelor. Totuși, a fost nevoie de organizarea clară a controalelor, presetări explicite, explicații pentru parametri și un sistem de export ușor de folosit.
 
 Exportul rezultatelor a fost tratat ca parte a experienței de utilizare: utilizatorul trebuie să poată reveni la rulări, să le caute, să identifice fiecare rulare prin ID și timestamp și să descarce datele în formate potrivite pentru raport.
+
+Adăugarea unui al doilea motor a introdus o provocare suplimentară de implementare: ambele motoare trebuiau să producă aceeași schemă de ieșire, astfel încât graficele, exporturile, istoricul de rulări și tabelele comparative să poată reutiliza același cod. Acest lucru a fost important deoarece valoarea de cercetare vine din compararea rezultatelor, nu din menținerea unor fluxuri separate pentru fiecare implementare.
 
 \section{Limitări}
 
@@ -199,6 +216,7 @@ Alte direcții de dezvoltare includ:
     \item calibrarea parametrilor pe baza răspunsurilor colectate;
     \item extinderea modelului cu echipe, departamente și roluri organizaționale mai detaliate;
     \item analiza de sensibilitate pentru a vedea ce parametri influențează cel mai mult rezultatele;
+    \item compararea sistematică între ieșirile motorului custom și ale motorului Mesa;
     \item salvarea persistentă a rulărilor într-o bază de date;
     \item îmbunătățirea vizualizărilor și a rapoartelor exportate automat;
     \item validarea parțială a modelului prin compararea tendințelor sintetice cu date reale anonimizate.
@@ -213,9 +231,10 @@ Demo-ul video va prezenta fluxul principal al aplicației:
     \item aplicarea unei presetări factory;
     \item ajustarea manuală a unor parametri;
     \item salvarea unei presetări locale;
+    \item selectarea motorului custom, a motorului Mesa sau a ambelor motoare;
     \item rularea unei simulări;
     \item pauză/reluarea unei rulări live;
-    \item compararea mai multor scenarii;
+    \item compararea mai multor scenarii cu motorul de comparație selectat;
     \item exportul rezultatelor dintr-un drawer de export;
     \item descărcarea fișierelor JSON, CSV, TXT, PNG și ZIP.
 \end{enumerate}
