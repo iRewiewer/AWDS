@@ -17,19 +17,67 @@
     urlcolor=blue!50!black,
     citecolor=blue!50!black
 }
+\defaultfontfeatures{Ligatures=TeX}
+\IfFontExistsTF{Arial}{
+    \setmainfont{Arial}
+    \setsansfont{Arial}
+}{
+    \setmainfont{TeX Gyre Heros}
+    \setsansfont{TeX Gyre Heros}
+}
+\IfFontExistsTF{Consolas}{
+    \setmonofont{Consolas}
+}{
+    \setmonofont{Latin Modern Mono}
+}
+\definecolor{awdsnavy}{HTML}{002060}
 \setlist{itemsep=0.25em, topsep=0.35em}
-
-\title{\textbf{Raport de implementare}\\Adaptive Workplace Dynamics Simulator}
-\author{Nume student: \textit{[de completat]}}
-\date{\today}
 
 \begin{document}
 
-\maketitle
+\begin{titlepage}
+\thispagestyle{empty}
+\centering
+\vspace*{2.2cm}
+\begin{minipage}{0.30\textwidth}
+    \centering
+    \includegraphics[height=3.0cm]{assets/poli_cover_logo.png}
+\end{minipage}
+\hfill
+\begin{minipage}{0.48\textwidth}
+    \centering
+    \includegraphics[height=3.0cm]{assets/acs_cover_logo.png}
+\end{minipage}
 
-\begin{abstract}
-Acest document descrie prototipul Adaptive Workplace Dynamics Simulator (AWDS), o aplicație Python cu interfață Streamlit pentru simularea sintetică a dinamicii unui mediu de lucru. Raportul prezintă funcționalitățile implementate, modelul folosit, structura tehnică, dificultățile întâmpinate, limitările și direcțiile posibile de dezvoltare. Rezultatele numerice urmează să fie completate după rularea scenariilor finale.
-\end{abstract}
+\vspace{3.0cm}
+
+{\sffamily\Large\color{awdsnavy} Raport cercetare semestrul 2\par}
+\vspace{1.0cm}
+{\sffamily\Huge\bfseries\color{awdsnavy} Adaptive Workplace Dynamics Simulator\par}
+\vspace{0.35cm}
+{\sffamily\Large\bfseries\color{awdsnavy} Simulare exploratorie agent-based a dinamicii organizaționale\par}
+
+\vfill
+
+\begin{minipage}{0.36\textwidth}
+    \raggedright
+    \sffamily
+    Masterand:\par
+    \vspace{0.25cm}
+    \textbf{Pop Andrei}
+\end{minipage}
+\hfill
+\begin{minipage}{0.36\textwidth}
+    \raggedright
+    \sffamily
+    Îndrumător:\par
+    \vspace{0.25cm}
+    \textbf{Anca Andreea Morar}
+\end{minipage}
+
+\vspace{2.0cm}
+{\sffamily\large 19 iunie 2026\par}
+\end{titlepage}
 
 \tableofcontents
 \newpage
@@ -42,13 +90,33 @@ Aplicația este construită ca instrument exploratoriu. Scopul ei nu este să de
 
 Interfața permite configurarea parametrilor, rularea simulării, vizualizarea graficelor, compararea scenariilor și exportul rezultatelor pentru folosire ulterioară în raport.
 
+\vspace{0.6cm}
+\section{Contextul cercetării și obiectivul}
+
+Dinamica unui mediu de lucru este dificil de studiat deoarece multe variabile relevante se influențează simultan. Volumul de lucru, presiunea termenelor limită, suportul managerial, autonomia, recuperarea, responsabilitățile familiale și relațiile sociale nu acționează ca factori izolați. Ele formează un sistem în care productivitatea pe termen scurt poate crește sub presiune, în timp ce aceeași presiune poate genera risc de burnout atunci când persistă pe perioade mai lungi.
+
+Prototipul este construit pornind de la această perspectivă sistemică. În loc să estimeze o singură valoare finală, AWDS urmărește o populație de agenți sintetici de tip angajat pe parcursul unor zile de lucru simulate. Astfel pot fi observate traiectorii: cum se modifică stresul în timp, cum se acumulează burnout-ul, cum reacționează productivitatea la presiune și cum apare turnover-ul după expunere repetată la condiții nefavorabile.
+
+Obiectivul de cercetare pentru această etapă este construirea unei platforme de simulare transparente, care să permită comparații controlate între scenarii organizaționale. Accentul nu este pus pe predicție, ci pe explorare. Un prototip util trebuie să permită întrebări precum: ce se schimbă atunci când suportul managerial crește, ce se întâmplă când overtime-ul și presiunea deadline-urilor sunt combinate și dacă aceeași tendință apare atunci când modelul este rulat printr-un alt motor de simulare.
+
+Din acest motiv, implementarea curentă urmărește patru cerințe:
+
+\begin{itemize}
+    \item configurarea clară a parametrilor organizaționali, personali, sociali și legați de evenimente;
+    \item rulări reproductibile pe baza seed-urilor explicite și a presetărilor salvate;
+    \item ieșiri comparabile între scenarii și între motoare;
+    \item export de date și grafice care pot fi folosite în raportul de disertație.
+\end{itemize}
+
+\clearpage
+
 \section{Funcționalități implementate}
 
 Prototipul include următoarele funcționalități principale:
 
 \begin{itemize}
     \item configurarea numărului de agenți, a numărului de zile simulate și a seed-ului aleator;
-    \item presetări factory pentru scenarii organizaționale predefinite;
+    \item presetări built-in cu scenarii organizaționale predefinite;
     \item presetări locale definite de utilizator, salvate în \texttt{user\_presets.json};
     \item buton explicit de aplicare a presetării, pentru a evita modificarea accidentală a parametrilor;
     \item salvarea configurației curente ca presetare nouă;
@@ -86,6 +154,22 @@ Agenții au următoarele variabile dinamice principale:
 \subsection{Factori statici}
 
 Fiecare agent este inițializat cu trăsături personale diferite: rol, reziliență, ambiție, nevoie de suport social, sensibilitate la navetă, încărcătură familială, variabilitate a sănătății, productivitate de bază, sensibilitate la stres și rată de recuperare.
+
+\subsection{Ipoteze ale modelului}
+
+Modelul folosește intenționat ipoteze simplificate, astfel încât comportamentul intern să rămână ușor de inspectat. Fiecare agent este sintetic, iar trăsăturile sale sunt generate din distribuții statistice simple, nu din înregistrări personale reale. Acest lucru păstrează prototipul potrivit pentru experimentare înainte de existența unei calibrări empirice.
+
+Ipotezele principale sunt:
+
+\begin{itemize}
+    \item majoritatea cantităților psihologice și organizaționale sunt normalizate între 0 și 1, iar emoția variază între -1 și 1;
+    \item rețeaua socială este statică pe durata unei rulări, deci modelul nu simulează încă prietenii noi, conflicte noi sau restructurări de echipă;
+    \item evenimentele aleatoare sunt șocuri probabilistice care afectează temporar stresul, emoția, energia, resursele sau cerințele;
+    \item turnover-ul este un eveniment al modelului declanșat de risc de stres și burnout, nu o predicție a comportamentului real al angajaților;
+    \item stilul de management și politica de lucru sunt implementate ca modificatori de parametri, nu ca agenți instituționali separați.
+\end{itemize}
+
+Aceste ipoteze limitează realismul, dar fac prototipul mai ușor de testat. În această etapă, transparența este mai importantă decât complexitatea. Un model mai complex ar deveni util doar după înțelegerea versiunii simple și după existența unor date empirice care să justifice parametri suplimentari.
 
 \subsection{Logica generală}
 
@@ -135,12 +219,92 @@ Mesa a fost adăugat ca motor alternativ în \texttt{mesa\_engine.py}. În aceas
 
 Scopul adăugării Mesa nu este obținerea unor rezultate identice. Scopul este compararea tendințelor scenariilor în două implementări. Dacă motorul custom și motorul Mesa arată direcții similare pentru aceeași presetare, același seed și aceleași controale de rulare, comportamentul modelului devine mai ușor de interpretat. Dacă ieșirile diferă, diferența ajută la identificarea ipotezelor sau detaliilor de implementare care trebuie cercetate mai atent.
 
+\subsection{Schemă comună de ieșire}
+
+Ambele motoare întorc aceleași categorii de date: numele proiectului, numele motorului, numele scenariului, seed-ul, configurația, seria temporală agregată, istoricul opțional pe agent, stările finale ale agenților, jurnalul de evenimente și sumarul final. Această schemă comună este importantă deoarece împiedică transformarea dashboard-ului în două aplicații separate. Același cod pentru grafice, exporturi, istoric de rulări și tabele comparative poate fi reutilizat indiferent de motorul selectat.
+
+Sumarul final conține metricile cele mai utile pentru compararea scenariilor: stres mediu final, burnout mediu final, productivitate medie finală, turnover total, burnout cumulativ și productivitate minimă. Seria temporală agregată este păstrată separat, astfel încât raportul să poată include atât valori finale, cât și traiectorii.
+
+\subsection{Fluxul dashboard-ului și al exporturilor}
+
+Dashboard-ul Streamlit este organizat în jurul fluxului normal al unei sesiuni exploratorii de simulare. Utilizatorul alege mai întâi o presetare sau ajustează manual parametrii din sidebar. Presetările sunt aplicate explicit, ceea ce evită schimbarea accidentală a configurației curente în timpul explorării scenariilor posibile. Același sidebar controlează motorul selectat, numărul de agenți, numărul de zile simulate, seed-ul și opțiunile principale de comportament, cum ar fi contagiunea emoțională, turnover-ul, înlocuirile și evenimentele aleatoare.
+
+După finalizarea unei rulări, dashboard-ul prezintă atât metrici sumar, cât și grafice de tip serie temporală. Graficul principal suprapune stresul, burnout-ul și productivitatea, astfel încât utilizatorul să poată observa dacă presiunea produce câștiguri de productivitate pe termen scurt, burnout pe termen mai lung sau ambele. Graficele secundare afișează starea emoțională, satisfacția, echilibrul muncă--viață, energia, numărul de angajați activi și turnover-ul. Această structură menține interfața orientată spre interpretare, nu doar spre valori brute.
+
+Tab-ul de export face parte din fluxul de cercetare, nu este doar o funcționalitate auxiliară. Fiecare rulare finalizată este păstrată într-un istoric de sesiune cu timestamp lizibil, nume de scenariu, nume de motor, seed și ID de rulare. Utilizatorul poate căuta în istoric și poate pregăti un pachet de export pentru o rulare selectată. Pachetul include date citibile de mașină, un sumar text și imagini ale graficelor, ceea ce face rezultatul potrivit pentru includerea ulterioară în raport.
+
+Acest flux este important deoarece prototipul trebuie să susțină iterația. Utilizatorul poate rula un scenariu, inspecta traiectoria, ajusta parametrii, rula un motor alternativ și apoi exporta rezultatele relevante pentru discuție. Dashboard-ul funcționează astfel atât ca interfață de simulare, cât și ca instrument de lucru pentru cercetare.
+
 \section{Scenarii și rezultate}
 \label{sec:rezultate}
 
 Această secțiune este un schelet care va fi completat după rularea scenariilor finale și exportul graficelor.
 
 Fluxul de comparație este central pentru prototip. Scenariile pot fi comparate cu motorul custom, cu motorul Mesa sau cu ambele motoare. Astfel se obține o imagine mai clară asupra întrebării de cercetare: dacă efectul observat ține de scenariu sau de diferențele introduse de motorul de simulare.
+
+\subsection{Designul scenariilor}
+
+Scenariile factory nu reprezintă organizații măsurate empiric. Ele sunt configurații controlate, gândite pentru a testa părți diferite ale modelului. Un baseline echilibrat oferă un punct neutru de referință, scenariile suportive testează efectul protector al resurselor, iar scenariile de presiune ridicată testează acumularea stresului și burnout-ului în condiții nefavorabile.
+
+\begin{table}[ht]
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{>{\raggedright\arraybackslash}p{0.30\textwidth}>{\raggedright\arraybackslash}p{0.62\textwidth}}
+        \toprule
+        Tip de scenariu & Rol în prototip \\
+        \midrule
+        Baseline echilibrat & Oferă o referință neutră pentru compararea schimbărilor de stil managerial, volum de lucru și politică de lucru. \\
+        Management suportiv & Testează dacă autonomia, recunoașterea, claritatea rolului și siguranța psihologică reduc stresul și burnout-ul. \\
+        Management autoritar sau overtime-heavy & Testează efectul cerințelor ridicate, autonomiei reduse, presiunii termenelor limită și suportului mai slab. \\
+        Remote sau program flexibil & Explorează cum naveta, flexibilitatea și încărcarea cu ședințe afectează starea de bine și productivitatea. \\
+        Mediu toxic & Crește conflictul, reduce siguranța și suportul și ridică presiunea pentru a observa dacă modelul produce deteriorare vizibilă. \\
+        \bottomrule
+    \end{tabular}
+    }
+    \caption{Logica de proiectare a scenariilor presetate AWDS.}
+\end{table}
+
+Tab-ul de comparare a scenariilor păstrează constante numărul de agenți, numărul de zile, seed-ul și controalele de rulare selectate, schimbând doar parametrii organizaționali specifici presetării. Astfel, efectul scenariului este izolat cât mai mult posibil în interiorul modelului sintetic. Selectorul separat de motor pentru comparații permite rularea aceleiași comparații prin motorul custom, prin motorul Mesa sau prin ambele.
+
+\subsection{Interpretarea metricilor}
+
+Metricile exportate trebuie interpretate ca indicatori interni ai modelului. Ele sunt utile deoarece rezumă părți diferite ale dinamicii simulate a mediului de lucru:
+
+\begin{table}[ht]
+    \centering
+    \begin{tabular}{>{\raggedright\arraybackslash}p{0.34\textwidth}>{\raggedright\arraybackslash}p{0.56\textwidth}}
+        \toprule
+        Metrică & Interpretare \\
+        \midrule
+        Stres mediu final & Stresul mediu al agenților activi la finalul rulării. Este util pentru compararea nivelului final de presiune. \\
+        Burnout mediu final & Burnout-ul mediu acumulat la finalul rulării. Este util pentru deteriorarea pe termen mai lung. \\
+        Productivitate medie finală & Productivitatea medie la finalul rulării. Trebuie citită împreună cu stresul și burnout-ul. \\
+        Turnover total & Numărul de angajați simulați care au plecat în timpul rulării. Indică dacă pragurile de stres și burnout au fost depășite suficient de des pentru a declanșa plecări. \\
+        Burnout cumulativ & Acumulare de tip arie a burnout-ului în timp. Este utilă când două scenarii se termină similar, dar unul a avut condiții mai rele pe parcurs. \\
+        Productivitate minimă & Productivitatea agregată minimă observată în timpul rulării. Este utilă pentru identificarea colapsului pe termen scurt sau a perturbărilor. \\
+        \bottomrule
+    \end{tabular}
+    \caption{Ghid de interpretare pentru principalele metrici comparative AWDS.}
+\end{table}
+
+\subsection{Flux experimental propus}
+
+Un experiment complet ar trebui să pornească de la un număr redus de presetări stabile, nu de la multe modificări manuale ale parametrilor. Mai întâi, baseline-ul echilibrat trebuie rulat cu un seed fix și cu un număr fix de agenți și zile. Acesta oferă o traiectorie de referință pentru stres, burnout, productivitate și turnover. Apoi, fiecare scenariu trebuie rulat cu același seed și aceleași controale, astfel încât diferențele să poată fi atribuite mai ușor configurației scenariului.
+
+Următorul pas este repetarea comparației cu ambele motoare. Scopul nu este forțarea unor valori identice, ci observarea direcției rezultatului. De exemplu, dacă scenariul toxic produce burnout mai ridicat decât baseline-ul în ambele motoare, această tendință este mai utilă pentru discuție. Dacă un motor produce un efect mult mai puternic sau mai slab, diferența trebuie documentată și folosită pentru inspectarea ipotezelor care o generează.
+
+Fluxul propus este:
+
+\begin{enumerate}
+    \item alegerea unui număr fix de agenți, a unui număr fix de zile și a unui seed;
+    \item rularea scenariului baseline cu motorul custom;
+    \item rularea scenariilor selectate pentru comparație cu aceleași controale;
+    \item repetarea aceluiași set de scenarii cu motorul Mesa;
+    \item exportul tabelului comparativ și al graficelor de tip serie temporală;
+    \item interpretarea tendințelor modelului, nu a unor relații cauzale din lumea reală.
+\end{enumerate}
+
+Acest flux păstrează raportul aliniat cu nivelul actual de maturitate al prototipului. El oferă suficientă structură pentru discutarea rezultatelor, dar menține clar faptul că validarea și calibrarea rămân direcții viitoare.
 
 \subsection{Configurația experimentală}
 

@@ -7,19 +7,21 @@ This folder contains two LaTeX variants of the prototype report:
 
 The results section is intentionally a skeleton. Fill it after running the final scenarios and exporting figures from the AWDS dashboard.
 
-## Suggested Build Commands
+## Build
 
-Tectonic is the recommended local compiler for this report because it is smaller than a full TeX distribution and fetches required packages automatically:
+From this folder, run the platform script:
 
-```bash
-tectonic main_ro.tex
+```bat
+build.bat
 ```
 
 ```bash
-tectonic main_en.tex
+./build.sh
 ```
 
-You can also upload the folder to Overleaf and compile either `.tex` file there. If using a traditional LaTeX distribution, compile each file with XeLaTeX because the reports use Unicode text and `fontspec`.
+Both scripts compile `main_ro.tex` and `main_en.tex` with XeLaTeX, run a second pass for the table of contents, and remove auxiliary files after a successful build.
+
+You can also upload the folder to Overleaf and compile either `.tex` file there. Use XeLaTeX because the reports use Unicode text and `fontspec`.
 
 ## Figures
 
