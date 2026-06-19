@@ -25,10 +25,18 @@
     \setmainfont{TeX Gyre Heros}
     \setsansfont{TeX Gyre Heros}
 }
-\IfFontExistsTF{Courier New}{
-    \setmonofont{Courier New}
+\IfFontExistsTF{Consolas}{
+    \setmonofont{Consolas}
 }{
-    \setmonofont{TeX Gyre Cursor}
+    \IfFontExistsTF{Courier New}{
+        \setmonofont{Courier New}
+    }{
+        \IfFontExistsTF{Latin Modern Mono}{
+            \setmonofont{Latin Modern Mono}
+        }{
+            \setmonofont{TeX Gyre Cursor}
+        }
+    }
 }
 \definecolor{awdsnavy}{HTML}{002060}
 \setlist{itemsep=0.25em, topsep=0.35em}
@@ -111,7 +119,7 @@ Prototipul include următoarele funcționalități principale:
     \item presetări locale definite de utilizator, salvate în \texttt{user\_presets.json};
     \item buton explicit de aplicare a presetării, pentru a evita modificarea accidentală a parametrilor;
     \item salvarea configurației curente ca presetare nouă;
-    \item controale sticky pentru rulare, pauză/reluare și curățarea rezultatului afișat;
+    \item controale pentru rulare, pauză/reluare și curățarea rezultatului afișat;
     \item editarea intervalelor vizibile ale sliderelor prin panoul \textit{Advanced slider ranges};
     \item grafice live pentru stres, burnout, productivitate și indicatori secundari;
     \item selector de motor pentru motorul custom, motorul Mesa sau ambele motoare rulate pe rând;
