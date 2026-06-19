@@ -83,19 +83,19 @@
 
 AWDS este un prototip software pentru simularea exploratorie a unei organizații formate din agenți de tip angajat. Fiecare agent are o stare internă dinamică, care include stres, burnout, productivitate, stare emoțională, energie, satisfacție profesională, echilibru muncă--viață și engagement. Simularea avansează în pași discreți, fiecare pas reprezentând o zi de lucru.
 
-Raportul se concentrează pe proiectarea și implementarea prototipului, nu pe o discuție teoretică extinsă despre comportamentul organizațional. Modelul este folosit ca instrument tehnic de experimentare: utilizatorul configurează parametri, rulează scenarii, compară traiectorii și exportă datele rezultate. Ieșirile sunt sintetice și trebuie citite ca rezultate interne ale modelului, nu ca date empirice despre organizații reale.
+Modelul este folosit ca instrument tehnic de experimentare: utilizatorul configurează parametri, rulează scenarii, compară traiectorii și exportă datele rezultate. Ieșirile sunt sintetice și trebuie citite ca rezultate interne ale modelului, nu ca date empirice despre organizații reale.
 
-Obiectivul acestei etape este construirea unei platforme transparente, reproductibile și ușor de extins. Prototipul trebuie să permită comparații controlate între scenarii organizaționale, dar și comparații între două implementări ale aceleiași idei de model: un motor custom și un motor bazat pe Mesa. Accentul este pus pe fluxul tehnic complet: definirea parametrilor, execuția simulării, vizualizarea rezultatelor și exportul lor pentru raportare.
+Obiectivul acestei etape este construirea unei platforme transparente, reproductibile și ușor de extins. Prototipul folosește Mesa ca motor agent-based principal și păstrează o implementare NumPy/custom pentru comparație tehnică. Accentul este pus pe fluxul complet: definirea parametrilor, execuția simulării, vizualizarea rezultatelor și exportul lor pentru raportare.
 
 Din acest motiv, implementarea curentă urmărește patru cerințe principale:
 
 \begin{itemize}
     \item configurarea clară a parametrilor organizaționali, personali, sociali și legați de evenimente;
     \item rulări reproductibile pe baza seed-urilor explicite și a presetărilor salvate;
-    \item ieșiri comparabile între scenarii și între motoare;
-    \item export de date și grafice care pot fi folosite în raportul de disertație.
+    \item export de date și grafice care pot fi folosite pentru comparații și rapoarte.
 \end{itemize}
 
+\vspace{0.4cm}
 \subsection{Funcționalități implementate}
 
 Funcționalitățile implementate pot fi grupate în câteva zone principale:
@@ -104,10 +104,11 @@ Funcționalitățile implementate pot fi grupate în câteva zone principale:
     \item configurarea numărului de agenți, zilelor simulate, seed-ului, presetărilor factory și presetărilor locale;
     \item controale pentru rulare, pauză/reluare, curățarea rezultatului și ajustarea intervalelor vizibile ale sliderelor;
     \item grafice live pentru stres, burnout, productivitate, stare emoțională, satisfacție, energie, turnover și distribuții finale;
-    \item selector pentru motorul custom, motorul Mesa sau rularea ambelor motoare pentru comparație;
+    \item selector pentru motorul Mesa, motorul NumPy/custom sau rularea ambelor motoare pentru comparație;
     \item istoric de rulări și export în formate JSON, CSV, TXT, PNG și ZIP.
 \end{itemize}
 
+\clearpage
 \section{Modelul de simulare}
 
 Fiecare pas al simulării reprezintă o zi de lucru. La fiecare zi, modelul aplică factori organizaționali, factori personali, influență socială, evenimente aleatoare și reguli de actualizare a stării fiecărui agent.
@@ -123,34 +124,80 @@ Agenții sunt sintetici și sunt inițializați cu rol, reziliență, ambiție, 
 
 Modelul este intenționat simplificat: rețeaua socială rămâne statică pe durata unei rulări, evenimentele aleatoare sunt șocuri probabilistice, iar stilul de management și politica de lucru sunt modificatori de parametri. Stresul crește în funcție de cerințe și evenimente negative, dar scade prin resurse, recuperare și reziliență. Burnout-ul se acumulează mai lent, iar productivitatea poate crește la presiune moderată, dar scade la stres ridicat și burnout.
 
+\vspace{0.4cm}
+\subsection{Fluxul unei zile simulate}
+
+La fiecare pas, motorul aplică aceeași ordine logică de actualizare pentru toți agenții activi. Mai întâi sunt citite setările scenariului: volum de lucru, stil managerial, autonomie, recunoaștere, conflict, flexibilitate, ședințe, navetă și probabilitatea evenimentelor. Aceste setări devin modificatori pentru cerințele și resursele zilnice ale agentului.
+
+După calculul presiunii de bază, agentul primește influențe individuale. Reziliența și rata de recuperare reduc acumularea stresului, ambiția poate crește temporar productivitatea, iar sensibilitatea la stres și încărcătura familială amplifică efectele negative. Influența socială este apoi aplicată prin rețeaua de relații: starea emoțională și stresul vecinilor pot modifica ușor starea agentului curent.
+
+\begin{enumerate}
+    \item se calculează presiunea zilnică produsă de scenariu;
+    \item se aplică factorii individuali ai agentului;
+    \item se propagă influența socială din rețeaua de colegi;
+    \item se generează evenimente aleatoare pozitive sau negative;
+    \item se actualizează stresul, burnout-ul, energia, satisfacția și productivitatea;
+    \item se verifică pragurile de turnover și, dacă este cazul, se programează înlocuirea.
+\end{enumerate}
+
+Această ordine este importantă pentru reproductibilitate: aceeași configurație și același seed trebuie să producă aceeași traiectorie în interiorul aceluiași motor. Între Mesa și motorul NumPy/custom pot apărea diferențe deoarece activarea agenților și gestionarea rețelei nu sunt implementate identic.
+
+\vspace{0.4cm}
 \subsection{Turnover}
 
 În aplicație, \textit{turnover} înseamnă numărul cumulat de angajați simulați care părăsesc organizația. Plecarea unui agent poate apărea atunci când nivelul de burnout sau stres depășește pragurile configurate. Dacă înlocuirea este activă, un nou agent intră după o întârziere configurată și are temporar o penalizare de productivitate din cauza onboarding-ului.
 
+\vspace{0.4cm}
 \subsection{Reproductibilitate}
 
-Același seed, aceeași configurație și același motor selectat duc la aceeași serie de rezultate pentru acel motor. Același seed nu produce neapărat traiectorii identice între motorul custom și Mesa, deoarece implementarea și ordinea de activare sunt diferite.
+Același seed, aceeași configurație și același motor selectat duc la aceeași serie de rezultate pentru acel motor. Același seed nu produce neapărat traiectorii identice între Mesa și motorul NumPy/custom, deoarece implementarea și ordinea de activare sunt diferite.
 
+\clearpage
 \section{Implementare tehnică}
 
-Aplicația este implementată în Python. Interfața web este realizată cu Streamlit, calculele numerice cu NumPy, datele sunt organizate/exportate cu Pandas, graficele exportabile sunt generate cu Matplotlib, iar graficele interactive folosesc Plotly. Implementarea Mesa folosește clasele de model și agent din Mesa împreună cu un spațiu de rețea bazat pe NetworkX.
+Aplicația este implementată în Python. Interfața web este realizată cu Streamlit, datele sunt organizate/exportate cu Pandas, graficele exportabile sunt generate cu Matplotlib, iar graficele interactive folosesc Plotly. Motorul principal folosește Mesa pentru model și agenți, împreună cu un spațiu de rețea bazat pe NetworkX. Implementarea NumPy/custom oferă o a doua rulare a acelorași reguli pentru comparație.
 
 \subsection{Arhitectura motoarelor de simulare}
 
-Prototipul separă acum logica de simulare în spatele unei interfețe de motor. Un motor expune aceleași operații de bază: avansarea cu o zi, rularea până la final, întoarcerea unui snapshot live și întoarcerea rezultatului final. Dashboard-ul folosește \texttt{engines.py} pentru a mapa numele motorului selectat la implementarea care trebuie rulată. Astfel, interfața nu depinde de implementarea exactă a motorului.
+Prototipul separă logica de simulare în spatele unei interfețe de motor. Mesa este implementarea principală a modelului agent-based, iar dashboard-ul o accesează prin aceeași interfață folosită de orice motor disponibil: avansarea cu o zi, rularea până la final, întoarcerea unui snapshot live și întoarcerea rezultatului final. \texttt{engines.py} mapează selecția din interfață la implementarea care trebuie rulată.
 
-Motorul custom, implementat în \texttt{engine.py}, gestionează direct lista de agenți, rețeaua socială, evenimentele aleatoare, actualizările zilnice, turnover-ul, înlocuirile și metricile agregate. Avantajul principal este transparența: ecuațiile de actualizare și formatul ieșirilor sunt ușor de inspectat.
+Pe lângă motorul Mesa, a fost scris și un motor NumPy, numit \textit{custom} în interfață și implementat în \texttt{engine.py}. Acesta gestionează direct lista de agenți, rețeaua socială, evenimentele aleatoare, actualizările zilnice, turnover-ul, înlocuirile și metricile agregate. Rolul lui este de motor de comparație: permite verificarea tendințelor produse de Mesa într-o implementare mai simplă și mai ușor de inspectat.
 
-\subsection{Alternativa Mesa}
+\subsection{Motorul Mesa}
 
-Mesa a fost adăugat ca motor alternativ în \texttt{mesa\_engine.py}. În această versiune, mediul de lucru este reprezentat ca model Mesa, angajații sunt agenți Mesa, iar relațiile sunt stocate într-un network grid bazat pe NetworkX. Motorul Mesa păstrează aceleași câmpuri de rezultat ca motorul custom, astfel încât dashboard-ul, exporturile și tabelele comparative pot trata uniform ambele motoare.
+Motorul Mesa este implementat în \texttt{mesa\_engine.py}. În această versiune, mediul de lucru este reprezentat ca model Mesa, angajații sunt agenți Mesa, iar relațiile sunt stocate într-un network grid bazat pe NetworkX. Această structură păstrează modelul aproape de paradigma agent-based folosită de bibliotecă și evită adaptarea forțată a Mesa la o arhitectură custom.
 
-Scopul adăugării Mesa nu este obținerea unor rezultate identice, ci compararea tendințelor în două implementări. Ambele motoare întorc aceeași schemă de ieșire: configurație, serie temporală agregată, stări finale, jurnal de evenimente și sumar final. Astfel, dashboard-ul, exporturile și tabelele comparative reutilizează același cod.
+Pentru comparație, motorul NumPy/custom întoarce aceeași schemă de ieșire ca Mesa: configurație, serie temporală agregată, stări finale, jurnal de evenimente și sumar final. Scopul nu este obținerea unor rezultate identice, ci verificarea faptului că tendințele principale apar și într-o implementare separată.
+
+\subsection{Comparație între implementări}
+
+Cele două motoare sunt tratate ca implementări separate ale aceleiași specificații de model. Mesa oferă structura agent-based principală, iar motorul NumPy/custom funcționează ca referință transparentă pentru verificarea rezultatelor. Tabelul următor rezumă diferențele tehnice relevante.
+
+\begin{table}[H]
+    \centering
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{>{\raggedright\arraybackslash}p{0.26\textwidth}>{\raggedright\arraybackslash}p{0.32\textwidth}>{\raggedright\arraybackslash}p{0.32\textwidth}}
+        \toprule
+        Aspect & Motor Mesa & Motor NumPy/custom \\
+        \midrule
+        Rol în proiect & Implementarea principală agent-based, bazată pe model și agenți Mesa. & Implementare de comparație, scrisă explicit pentru inspectarea regulilor. \\
+        Reprezentarea agenților & Agenți Mesa conectați într-un spațiu de rețea NetworkX. & Obiecte gestionate direct într-o listă și actualizate de motor. \\
+        Activare & Pașii zilnici sunt coordonați prin modelul Mesa. & Motorul controlează direct ordinea de actualizare și agregarea. \\
+        Ieșire & Produce seria temporală, stările finale, evenimentele și sumarul final. & Produce aceeași schemă de ieșire pentru comparații și exporturi. \\
+        Utilitate & Păstrează modelul aproape de paradigma bibliotecii Mesa. & Face ecuațiile și transformările mai ușor de urmărit în cod. \\
+        \bottomrule
+    \end{tabular}
+    }
+    \caption{Comparație tehnică între motorul Mesa și motorul NumPy/custom.}
+\end{table}
+
+Separarea aceasta ajută și la mentenanță. Dashboard-ul nu trebuie să știe cum sunt activați agenții în fiecare motor, ci doar să primească aceeași structură de date la final. În consecință, graficele, exporturile, istoricul rulărilor și tabelul comparativ pot fi reutilizate fără ramuri speciale pentru fiecare implementare.
 
 \subsection{Fluxul dashboard-ului și al exporturilor}
 
 Dashboard-ul Streamlit susține fluxul de lucru exploratoriu: alegerea unei presetări, ajustarea parametrilor, rularea simulării, compararea scenariilor și exportul rezultatelor. După finalizarea unei rulări, interfața afișează metrici sumar, grafice de tip serie temporală și distribuții finale.
 
+\clearpage
 \subsection{Interfața aplicației}
 
 Interfața aplicației este organizată astfel încât configurarea, rularea și interpretarea rezultatelor să fie disponibile în același flux de lucru. Sidebar-ul conține presetările, controalele de rulare și parametrii principali ai modelului, iar zona centrală afișează tab-urile pentru rulare, comparare, export și descrierea modelului.
@@ -161,6 +208,7 @@ Interfața aplicației este organizată astfel încât configurarea, rularea și
     \caption{Tab-ul \textit{Run Simulation} după rularea scenariului baseline.}
 \end{figure}
 
+\clearpage
 Tab-ul de comparare rulează aceleași presetări cu aceeași configurație globală și afișează rezultatele într-un tabel agregat. Această vedere este utilă pentru inspectarea rapidă a diferențelor dintre scenarii înainte de exportul datelor.
 
 \begin{figure}[H]
@@ -174,13 +222,33 @@ Tab-ul de comparare rulează aceleași presetări cu aceeași configurație glob
 
 Această secțiune prezintă o rulare comparativă a presetărilor principale din prototip. Scopul ei este să demonstreze fluxul tehnic de analiză, nu să stabilească o concluzie empirică despre mediile de lucru reale.
 
-Fluxul de comparație este central pentru prototip. Scenariile pot fi comparate cu motorul custom, cu motorul Mesa sau cu ambele motoare. Astfel se obține o imagine mai clară asupra întrebării de cercetare: dacă efectul observat ține de scenariu sau de diferențele introduse de motorul de simulare.
+Fluxul de comparație este central pentru prototip. Scenariile pot fi rulate cu motorul Mesa, cu motorul NumPy/custom sau cu ambele motoare. Astfel se obține o imagine mai clară asupra întrebării de cercetare: dacă efectul observat ține de scenariu sau de diferențele introduse de motorul de simulare.
 
 \subsection{Design experimental}
 
 Au fost selectate patru presetări: baseline, suportiv + flexibil, autoritar + overtime și toxic. Ele acoperă un caz neutru, unul favorabil și două cazuri de presiune ridicată. Pentru fiecare rulare s-au păstrat constante numărul de agenți, numărul de zile, seed-ul și controalele generale, schimbând doar presetarea și motorul de simulare.
 
 Metricile urmărite sunt stresul final, burnout-ul final, productivitatea finală, turnover-ul și burnout-ul cumulativ. Ele trebuie citite ca indicatori interni ai modelului, utili pentru compararea scenariilor sintetice, nu ca valori empirice despre organizații reale.
+
+\subsection{Interpretarea metricilor}
+
+Metricile exportate rezumă stări diferite ale organizației simulate. Ele sunt folosite împreună, deoarece o singură valoare poate ascunde dinamici importante. De exemplu, două scenarii pot avea burnout final apropiat, dar unul poate fi mult mai instabil pe parcurs.
+
+\begin{table}[H]
+    \centering
+    \begin{tabular}{>{\raggedright\arraybackslash}p{0.34\textwidth}>{\raggedright\arraybackslash}p{0.56\textwidth}}
+        \toprule
+        Metrică & Rol în interpretare \\
+        \midrule
+        Stres final & Nivelul mediu de presiune la finalul rulării. \\
+        Burnout final & Efectul acumulat al stresului susținut. \\
+        Productivitate finală & Rezultatul operațional al agenților activi la final. \\
+        Turnover total & Numărul cumulat de plecări produse de pragurile modelului. \\
+        Burnout cumulativ & Aria aproximativă a burnout-ului în timp, utilă pentru scenarii cu traiectorii diferite. \\
+        \bottomrule
+    \end{tabular}
+    \caption{Metricile principale folosite în comparația scenariilor.}
+\end{table}
 
 \subsection{Configurația experimentală}
 
@@ -250,7 +318,7 @@ Principala dificultate a fost proiectarea unui model suficient de expresiv înc�
 
 O altă dificultate a fost balansarea parametrilor astfel încât scenariile să producă diferențe vizibile fără să ajungă imediat în extreme. A fost necesară separarea între stres, burnout, energie, satisfacție și productivitate, deoarece aceste variabile nu se mișcă toate cu aceeași viteză și nu răspund identic la aceiași factori.
 
-La nivel tehnic, interfața, exporturile și al doilea motor au trebuit aliniate la aceeași schemă de ieșire. Astfel, graficele, istoricul rulărilor și tabelele comparative pot folosi același cod indiferent dacă rezultatul vine din motorul custom sau din Mesa.
+La nivel tehnic, interfața, exporturile și motorul NumPy/custom au trebuit aliniate la schema de ieșire folosită de Mesa. Astfel, graficele, istoricul rulărilor și tabelele comparative pot folosi același cod indiferent de motorul selectat.
 
 \section{Limitări}
 
@@ -266,11 +334,5 @@ Direcția cea mai importantă este calibrarea modelului pe date reale, de exempl
     \item extinderea modelului cu echipe, departamente și roluri organizaționale;
     \item salvarea persistentă a rulărilor și generarea automată de rapoarte.
 \end{itemize}
-
-\section{Demo video}
-
-Demo-ul video prezintă pornirea aplicației, aplicarea unei presetări, rularea unei simulări, compararea scenariilor cu motoarele disponibile și exportul rezultatelor în formatele generate de prototip.
-
-Link demo video: \textit{[de completat]}
 
 \end{document}
